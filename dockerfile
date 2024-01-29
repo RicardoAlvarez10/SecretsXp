@@ -1,29 +1,18 @@
-# Usa una imagen base de PHP con Apache
-FROM php:8.1.2-apache
+FROM php:8.1.2-fpm-alpine
 
-# Instala las dependencias necesarias
-RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libzip-dev \
-    && docker-php-ext-install zip
+RUN apk add --no-cache nginx wget
 
-# Habilita el módulo de Apache necesario para Laravel
-RUN a2enmod rewrite
+RUN mkdir -p /run/nginx
 
-# Copia los archivos de la aplicación al contenedor
-COPY . /var/www/html/
+COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# Establece los permisos adecuados
-RUN chown -R www-data:www-data /var/www/html/storage
+RUN mkdir -p /app
+COPY . /app
 
-# Instala las dependencias de Composer
-ENV COMPOSER_ALLOW_SUPERUSER=1
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-RUN composer install --optimize-autoloader --no-dev
+RUN sh -c "wget http://getcomposer.org/composer.phar && chmod a+x composer.phar && mv composer.phar /usr/local/bin/composer"
+RUN cd /app && \
+    /usr/local/bin/composer install --no-dev
 
-# Configura el contenedor para que escuche en el puerto 80
-EXPOSE 80
+RUN chown -R www-data: /app
 
-# Inicia Apache al ejecutar el contenedor
-CMD ["apache2-foreground"]
+CMD sh /app/docker/startup.sh
